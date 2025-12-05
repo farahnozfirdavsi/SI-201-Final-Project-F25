@@ -93,21 +93,36 @@ def store_scraped_songs(songs_list, db_name: str = DB_NAME):
 
 
 def main():
-    billboard_weeks = [
-        "2020-04-25", "2020-05-09", "2020-05-16", "2020-05-23", "2020-05-30",
-        "2020-06-06", "2020-06-13", "2020-06-20", "2020-06-27", "2020-07-04",
-        "2020-07-11", "2020-07-18", "2020-07-25", "2020-08-01", "2020-08-08",
-        "2020-08-15", "2020-08-22", "2020-08-29", "2020-09-05", "2020-09-12",
-        "2020-09-19", "2020-09-26", "2020-10-03", "2020-10-10"
-    ]
+    BILLBOARD_WEEKS_2020 = [
+    "2020-04-25",
+    "2020-05-02",
+    "2020-05-09",
+    "2020-05-16",
+    "2020-05-23",
+    "2020-05-30",
+    "2020-06-06",
+    "2020-06-13",
+    "2020-06-20",
+    "2020-06-27",
+    "2020-07-04",
+    "2020-07-11",
+    "2020-07-18",
+    "2020-07-25",
+    "2020-08-01",
+    "2020-08-08",
+    "2020-08-15",
+    "2020-08-22",
+    "2020-08-29",
+]
 
-    for week in billboard_weeks:
-        print(f"Scraping Billboard chart for {week}...")
+    for week in BILLBOARD_WEEKS_2020:
         url = f"https://www.billboard.com/charts/hot-100/{week}/"
+        print(f"\nScraping Billboard Hot 100 for {week} ...")
         songs = scrape_billboard(url)
+        print(f"  Found {len(songs)} songs. Storing in database...")
         store_scraped_songs(songs)
 
-    print("All weeks scraped and stored!")
+    print("\n Done scraping all Billboard weeks.")
 
 
 if __name__ == "__main__":
