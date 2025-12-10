@@ -115,14 +115,26 @@ def main():
     "2020-08-29",
 ]
 
+    total_inserted = 0
+    MAX_PER_RUN = 25
+
     for week in BILLBOARD_WEEKS_2020:
+        if total_inserted >= MAX_PER_RUN:
+            break
+
         url = f"https://www.billboard.com/charts/hot-100/{week}/"
         print(f"\nScraping Billboard Hot 100 for {week} ...")
         songs = scrape_billboard(url)
-        print(f"  Found {len(songs)} songs. Storing in database...")
-        store_scraped_songs(songs)
 
-    print("\n Done scraping all Billboard weeks.")
+        # Only take the remaining allowed songs this run
+        remaining = MAX_PER_RUN - total_inserted
+        songs_to_store = songs[:remaining]
+
+        print(f"  Storing {len(songs_to_store)} songs in database...")
+        store_scraped_songs(songs_to_store)
+        total_inserted += len(songs_to_store)
+
+    print(f"\nDone scraping. Inserted {total_inserted} songs this run.")
 
 
 if __name__ == "__main__":

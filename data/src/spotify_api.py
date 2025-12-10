@@ -168,7 +168,7 @@ def populate_spotify_for_scraped_songs(limit=200):
 
 def main():
     # Adjust limit as needed; 150–300 is plenty for the project
-    populate_spotify_for_scraped_songs(limit=800)
+    populate_spotify_for_scraped_songs(limit=25)
 
 
 if __name__ == "__main__":

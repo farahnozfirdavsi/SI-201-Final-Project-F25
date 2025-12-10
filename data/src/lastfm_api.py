@@ -128,7 +128,7 @@ def populate_lastfm(limit=150):
 
 def main():
     # Up to 150 songs – change this number if you want
-    populate_lastfm(limit=150)
+    populate_lastfm(limit=25)
 
 
 if __name__ == "__main__":

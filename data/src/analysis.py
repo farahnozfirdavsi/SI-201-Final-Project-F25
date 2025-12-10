@@ -187,6 +187,22 @@ def compute_correlations():
     return corr_weekly, corr_vp
 
 
+def export_weekly_summary_csv(
+    out_path=os.path.join(BASE_DIR, "weekly_mood_mental_health_summary.csv")
+):
+    """
+    Write a self-explanatory CSV from our weekly mood + mental health calculations.
+    Columns: date, avg_valence, avg_energy, anxiety_percent, depression_percent
+    """
+    df = get_weekly_mood_and_anxiety()
+    # Keep key columns
+    cols = ["date", "avg_valence", "avg_energy", "anxiety_percent", "depression_percent"]
+    df_out = df[cols].copy()
+
+    df_out.to_csv(out_path, index=False)
+    print(f"Weekly summary written to: {out_path}")
+
+
 def main():
     weekly = get_weekly_mood_and_anxiety()
     print("Weekly merged mood + anxiety (first 10 rows):")
@@ -201,6 +217,7 @@ def main():
     print(artist_profile, "\n")
 
     compute_correlations()
+    export_weekly_summary_csv()
 
 
 if __name__ == "__main__":

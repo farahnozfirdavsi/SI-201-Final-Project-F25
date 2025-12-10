@@ -1,17 +1,16 @@
 import sqlite3
+import os
 
 # Default database name – you can change this if you want
-DB_NAME = "afa.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "afa.db")
+DB_NAME = DB_PATH
 
-
-def get_connection(db_name: str = DB_NAME) -> sqlite3.Connection:
-    """
-    Create a SQLite connection with foreign key support enabled.
-    """
-    conn = sqlite3.connect(db_name)
-    # Make sure foreign key constraints actually work in SQLite
+def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
+
 
 
 def create_tables(db_name: str = DB_NAME) -> None:
@@ -91,7 +90,21 @@ def create_tables(db_name: str = DB_NAME) -> None:
         """
     )
 
-    # 5. CDC mental health weekly trends
+    # 5. Raw CDC mental health data (many rows from the API)
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS CDCRaw (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_name TEXT,
+            state TEXT,
+            indicator TEXT,
+            time_period_start_date TEXT,
+            value REAL
+        );
+        """
+    )
+
+    # 6. CDC mental health weekly trends 
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS MentalHealthTrends (
