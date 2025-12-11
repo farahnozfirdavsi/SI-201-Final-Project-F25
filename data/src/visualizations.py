@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # ==========================
-# Cute global pastel theme 🌸
+# Color theme
 # ==========================
 
 sns.set_theme(
