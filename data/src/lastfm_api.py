@@ -1,135 +1,142 @@
 import os
-import requests
 import sqlite3
+import requests
+from keys import LASTFM_API_KEY
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
+DB_PATH = os.path.join(BASE_DIR, "afa.db")
 
 
-# CONFIG
-BASE_URL = "http://ws.audioscrobbler.com/2.0/"
-DB_NAME = "afa.db"
-
-
-def get_connection(db_name=DB_NAME):
-    """Return SQLite connection."""
-    conn = sqlite3.connect(db_name)
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
 
-# LAST.FM REQUEST FUNCTION
-def get_lastfm_popularity(song_title: str, artist: str):
+def debug_db():
     """
-    Query Last.fm for listener_count and playcount.
-    Returns a dictionary or None if not found.
+    Print which DB we are using and what tables exist
+    This helps avoid 'no such table' errors
     """
+    conn = get_connection()
+    cur = conn.cursor()
+    print("Using DB:", DB_PATH)
+    print("Tables in this DB:")
+    for (name,) in cur.execute("SELECT name FROM sqlite_master WHERE type='table';"):
+        print(" -", name)
+    conn.close()
 
-    api_key = os.getenv("LASTFM_API_KEY")
 
-    if not api_key:
-        raise RuntimeError(
-            "ERROR: LASTFM_API_KEY environment variable not set.\n"
-            "Please run:\n"
-            "export LASTFM_API_KEY=\"yourkeyhere\""
-        )
+def get_lastfm_popularity(title, artist):
+    """
+    Call Last.fm track.getInfo for (artist, title).
+    Returns dict with listeners + playcount, or None if not found.
+    """
+    url = "http://ws.audioscrobbler.com/2.0/"
 
     params = {
         "method": "track.getInfo",
-        "api_key": api_key,
+        "api_key": LASTFM_API_KEY,
         "artist": artist,
-        "track": song_title,
-        "format": "json"
+        "track": title,
+        "format": "json",
     }
 
-    try:
-        response = requests.get(BASE_URL, params=params, timeout=10)
-        data = response.json()
-    except Exception as e:
-        print(f"Request error for {song_title} - {artist}: {e}")
+    resp = requests.get(url, params=params)
+    data = resp.json()
+
+    if "track" not in data:
         return None
 
-    # Last.fm returns error in JSON sometimes
-    if "error" in data:
-        print(f"Last.fm returned error for {song_title} - {artist}: {data.get('message')}")
-        return None
-
-    track = data.get("track")
-    if not track:
-        print(f"No Last.fm track data found for {song_title} - {artist}")
-        return None
-
+    track = data["track"]
     listeners = track.get("listeners")
     playcount = track.get("playcount")
 
     if listeners is None or playcount is None:
-        print(f"Missing popularity data for {song_title} - {artist}")
         return None
 
     try:
-        return {
-            "listener_count": int(listeners),
-            "playcount": int(playcount)
-        }
-    except:
-        print(f"Could not convert popularity values for {song_title} - {artist}")
+        listeners = int(listeners)
+        playcount = int(playcount)
+    except ValueError:
         return None
 
+    return {
+        "listeners": listeners,
+        "playcount": playcount,
+    }
 
-# STORE ROW INTO Popularity TABLE
-def store_popularity(song_id: int, listeners: int, plays: int, db_name=DB_NAME):
-    conn = get_connection(db_name)
+
+def store_popularity(conn, song_id, pop):
+    """
+    Insert one row into Popularity for the given song_id.
+    Assumes table:
+      Popularity(id, song_id, listener_count, playcount)
+    """
     cur = conn.cursor()
-
     cur.execute(
         """
         INSERT INTO Popularity (song_id, listener_count, playcount)
         VALUES (?, ?, ?)
         """,
-        (song_id, listeners, plays)
+        (song_id, pop["listeners"], pop["playcount"]),
     )
-
     conn.commit()
-    conn.close()
 
 
-# MAIN POPULATE FUNCTION — RUNS THROUGH Songs TABLE
-def populate_lastfm(limit=150):
+def populate_lastfm(limit=25):
     """
-    Fetch Last.fm popularity for up to `limit` songs
-    that do NOT already have a row in Popularity.
+    For up to `limit` songs that do NOT yet have a Popularity row,
+    look up Last.fm track info and store listener_count + playcount.
     """
+
+    debug_db()  # show which DB and tables we're using
+
     conn = get_connection()
     cur = conn.cursor()
 
-    query = """
-        SELECT s.song_id, ss.song_title, ss.artist_name
-        FROM Songs s
-        JOIN ScrapedSongs ss ON ss.id = s.scraped_song_id
-        WHERE s.song_id NOT IN (SELECT song_id FROM Popularity)
-        ORDER BY s.song_id
-        LIMIT ?
-    """
+    # If Songs table truly doesn't exist, fail with a clear message
+    try:
+        rows = cur.execute(
+            """
+            SELECT s.song_id, ss.song_title, ss.artist_name
+            FROM Songs s
+            JOIN ScrapedSongs ss ON ss.id = s.scraped_song_id
+            LEFT JOIN Popularity p ON p.song_id = s.song_id
+            WHERE p.id IS NULL
+            LIMIT ?;
+            """,
+            (limit,),
+        ).fetchall()
+    except sqlite3.OperationalError as e:
+        print("\n[ERROR] While querying Songs/Popularity:")
+        print(e)
+        print(
+            "\nIt looks like this afa.db does not have a Songs table.\n"
+            "Make sure you have already run spotify_api.py and that you're using "
+            "the same data/src/afa.db that your other scripts use."
+        )
+        conn.close()
+        return
 
-    rows = cur.execute(query, (limit,)).fetchall()
-    conn.close()
-
-    print(f"Found {len(rows)} songs without Last.fm data (limit={limit}).")
+    print(f"\nFound {len(rows)} songs needing Last.fm data.")
 
     for song_id, title, artist in rows:
-        print("\n-----------------------------------------")
-        print(f"Song_id={song_id} | {title} — {artist}")
+        print(f"\nSong_id={song_id} | {title} — {artist}")
 
-        popularity = get_lastfm_popularity(title, artist)
-        if popularity is None:
-            print("  ❌ Skipping (not found).")
+        pop = get_lastfm_popularity(title, artist)
+        if pop is None:
+            print("  Last.fm: Track not found or missing counts. Skipping.")
             continue
 
-        store_popularity(song_id, popularity["listener_count"], popularity["playcount"])
-        print(f"  ✅ Stored Last.fm popularity: listeners={popularity['listener_count']}, plays={popularity['playcount']}")
+        store_popularity(conn, song_id, pop)
+        print(
+            f"  Stored Last.fm popularity: listeners={pop['listeners']}, plays={pop['playcount']}"
+        )
 
-
-def main():
-    # Up to 150 songs – change this number if you want
-    populate_lastfm(limit=25)
+    conn.close()
+    print("\nDone populating Last.fm popularity.")
 
 
 if __name__ == "__main__":
-    main()
+    populate_lastfm(limit=25)

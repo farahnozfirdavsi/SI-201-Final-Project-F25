@@ -1,11 +1,10 @@
 import os
 import sqlite3
-import time
-
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+from keys import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
 
-BASE_DIR = os.path.dirname(__file__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
 DB_PATH = os.path.join(BASE_DIR, "afa.db")
 
 
@@ -15,161 +14,110 @@ def get_connection():
     return conn
 
 
-def get_spotify_client():
-    client_id = os.getenv("SPOTIPY_CLIENT_ID")
-    client_secret = os.getenv("SPOTIPY_CLIENT_SECRET")
-
-    if not client_id or not client_secret:
-        raise RuntimeError(
-            "SPOTIPY_CLIENT_ID and/or SPOTIPY_CLIENT_SECRET are not set.\n"
-            "Run:\n"
-            '  export SPOTIPY_CLIENT_ID="your_client_id"\n'
-            '  export SPOTIPY_CLIENT_SECRET="your_client_secret"'
-        )
-
-    auth_manager = SpotifyClientCredentials()
-    sp = spotipy.Spotify(auth_manager=auth_manager)
-    return sp
-
-
-def get_spotify_track(sp, song_title, artist_name):
+def init_spotify_client():
     """
-    Use Spotify search to find a track and return basic metadata:
-    track_id, canonical title/artist, popularity, release_year.
-
-    Returns None if no suitable result is found.
+    Initialize Spotipy client using keys from keys.py
     """
+    auth_manager = SpotifyClientCredentials(
+        client_id=SPOTIFY_CLIENT_ID,
+        client_secret=SPOTIFY_CLIENT_SECRET,
+    )
+    return spotipy.Spotify(auth_manager=auth_manager)
 
-    query = f"track:{song_title} artist:{artist_name}"
-    try:
-        results = sp.search(q=query, type="track", limit=1)
-    except Exception as e:
-        print(f"Spotify search error for {song_title} - {artist_name}: {e}")
-        return None
+
+def get_spotify_track(sp, title, artist):
+    """
+    Search for a track on Spotify by title + artist.
+    Returns a dict with track_id, popularity, release_year or None if not found.
+    """
+    query = f"track:{title} artist:{artist}"
+    results = sp.search(q=query, type="track", limit=1)
 
     items = results.get("tracks", {}).get("items", [])
     if not items:
-        # Try a looser search: just the title
-        try:
-            results = sp.search(q=song_title, type="track", limit=1)
-            items = results.get("tracks", {}).get("items", [])
-        except Exception as e:
-            print(f"Spotify loose search error for {song_title}: {e}")
-            return None
-
-        if not items:
-            print(f"No Spotify results for: {song_title} - {artist_name}")
-            return None
+        return None
 
     track = items[0]
-    track_id = track["id"]
-    popularity = track.get("popularity", None)
-
-    # release_date can be "YYYY-MM-DD", "YYYY-MM", or "YYYY"
-    release_date = track["album"].get("release_date", "")
-    release_year = None
-    if len(release_date) >= 4 and release_date[:4].isdigit():
-        release_year = int(release_date[:4])
-
-    track_title = track["name"]
-    main_artist = track["artists"][0]["name"]
+    release_date = track["album"]["release_date"]  
+    release_year = int(release_date[:4])
 
     return {
-        "spotify_track_id": track_id,
-        "song_title": track_title,
-        "artist_name": main_artist,
-        "popularity": popularity,
+        "track_id": track["id"],
+        "popularity": track["popularity"],
         "release_year": release_year,
     }
 
 
-def insert_song_and_audio_row(cur, scraped_id, track_info):
+def store_song_row(conn, scraped_song_id, track_info):
     """
-    Insert into Songs and create a placeholder row in SpotifyAudioFeatures
-    with null audio features (to be filled by Kaggle later).
+    Insert one row into Songs.
+    Assumes schema:
+      Songs(song_id, scraped_song_id, spotify_track_id, genre, popularity, release_year)
     """
+    cur = conn.cursor()
+
     cur.execute(
         """
-        INSERT INTO Songs (scraped_song_id, spotify_track_id, popularity, release_year)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO Songs (scraped_song_id, spotify_track_id, genre, popularity, release_year)
+        VALUES (?, ?, ?, ?, ?)
         """,
         (
-            scraped_id,
-            track_info["spotify_track_id"],
+            scraped_song_id,
+            track_info["track_id"],
+            None,  # genre (we're not pulling Spotify genres here)
             track_info["popularity"],
             track_info["release_year"],
         ),
     )
-    song_id = cur.lastrowid
 
-    # Ensure a matching row in SpotifyAudioFeatures
-    cur.execute(
-        """
-        INSERT INTO SpotifyAudioFeatures (song_id, valence, energy, danceability, tempo, acousticness, instrumentalness)
-        VALUES (?, NULL, NULL, NULL, NULL, NULL, NULL)
-        """,
-        (song_id,),
-    )
-    return song_id
+    conn.commit()
+    return cur.lastrowid
 
 
-def populate_spotify_for_scraped_songs(limit=200):
+def populate_spotify_data(limit=25):
     """
-    For ScrapedSongs rows that do not yet have Songs entries,
-    query Spotify and create rows in Songs + SpotifyAudioFeatures.
-    """
+    Grab up to `limit` rows from ScrapedSongs that do NOT yet have a Songs row,
+    fetch Spotify track info for each, and store in Songs.
 
-    sp = get_spotify_client()
+    Audio features (valence, energy, etc.) will be filled separately via the Kaggle merge
+    """
     conn = get_connection()
     cur = conn.cursor()
+    sp = init_spotify_client()
 
-    # Select scraped songs that do NOT yet have a Songs row
-    query = """
-        SELECT s.id, s.song_title, s.artist_name
-        FROM ScrapedSongs s
-        LEFT JOIN Songs t ON t.scraped_song_id = s.id
-        WHERE t.song_id IS NULL
-        ORDER BY s.id
-    """
+    print("Using database:", DB_PATH)
 
-    if limit is not None:
-        query += f" LIMIT {int(limit)}"
+    rows = cur.execute(
+        """
+        SELECT ss.id, ss.song_title, ss.artist_name
+        FROM ScrapedSongs ss
+        LEFT JOIN Songs s ON s.scraped_song_id = ss.id
+        WHERE s.song_id IS NULL
+        LIMIT ?;
+        """,
+        (limit,),
+    ).fetchall()
 
-    rows = cur.execute(query).fetchall()
-    print(f"Found {len(rows)} scraped songs without Spotify metadata.")
+    print(f"Found {len(rows)} scraped songs needing Spotify track info.")
 
-    processed = 0
+    for scraped_id, title, artist in rows:
+        print(f"\nProcessing ScrapedSongs.id={scraped_id} | {title} — {artist}")
 
-    for scraped_id, song_title, artist_name in rows:
-        print("\n------------------------------------")
-        print(f"ScrapedSongs.id={scraped_id} | {song_title} — {artist_name}")
-
-        track_info = get_spotify_track(sp, song_title, artist_name)
+        track_info = get_spotify_track(sp, title, artist)
         if track_info is None:
-            print("  Could not find a suitable Spotify track. Skipping.")
+            print("  No Spotify match. Skipping.")
             continue
 
+        song_id = store_song_row(conn, scraped_id, track_info)
         print(
-            f"  Spotify match: {track_info['song_title']} — {track_info['artist_name']} "
-            f"(id={track_info['spotify_track_id']}, pop={track_info['popularity']}, year={track_info['release_year']})"
+            f"  Stored in Songs as song_id={song_id}, "
+            f"popularity={track_info['popularity']}, "
+            f"year={track_info['release_year']}"
         )
 
-        song_id = insert_song_and_audio_row(cur, scraped_id, track_info)
-        conn.commit()
-        processed += 1
-        print(f"  Inserted as Songs.song_id={song_id} and created placeholder SpotifyAudioFeatures row.")
-
-        # Optional small delay to be polite to the API
-        time.sleep(0.1)
-
     conn.close()
-    print(f"\nDone. Inserted Spotify metadata for {processed} songs.")
-
-
-def main():
-    # Adjust limit as needed; 150–300 is plenty for the project
-    populate_spotify_for_scraped_songs(limit=25)
+    print("\nDone populating Spotify Songs (IDs + popularity + year).")
 
 
 if __name__ == "__main__":
-    main()
+    populate_spotify_data()
