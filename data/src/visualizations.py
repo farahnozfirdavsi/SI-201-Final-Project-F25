@@ -366,7 +366,7 @@ def plot_artist_emotional_profile():
         data=df,
         x="artist_name",
         y="avg_valence",
-        palette=PASTEL_COLORS,
+        color=PASTEL_COLORS[1],
         edgecolor="white",
     )
     plt.title("Emotional Profile of Artists (Average Valence)", fontsize=14)
