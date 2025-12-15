@@ -21,6 +21,7 @@ def create_tables(db_name: str = DB_NAME) -> None:
       - Songs
       - SpotifyAudioFeatures
       - Popularity
+      - CDCRaw
       - MentalHealthTrends
     """
     conn = get_connection(db_name)
