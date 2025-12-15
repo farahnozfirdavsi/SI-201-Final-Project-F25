@@ -19,7 +19,7 @@ def extract_chart_date_from_url(url: str) -> str:
 
 
 
-DB_NAME = "afa.db"
+DB_NAME = "afa_v2.db"
 
 
 def get_connection(db_name: str = DB_NAME) -> sqlite3.Connection:

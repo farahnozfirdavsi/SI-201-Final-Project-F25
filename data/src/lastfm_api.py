@@ -4,7 +4,7 @@ import requests
 from keys import LASTFM_API_KEY
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
-DB_PATH = os.path.join(BASE_DIR, "afa.db")
+DB_PATH = os.path.join(BASE_DIR, "afa_v2.db")
 
 
 def get_connection():

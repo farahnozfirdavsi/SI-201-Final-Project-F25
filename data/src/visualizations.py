@@ -5,9 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# ==========================
 # Color theme
-# ==========================
+
 
 sns.set_theme(
     style="whitegrid",
@@ -42,10 +41,7 @@ def get_connection():
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
-
-# ==========================
 # Data helper functions
-# ==========================
 
 def get_weekly_mood_and_anxiety():
     """

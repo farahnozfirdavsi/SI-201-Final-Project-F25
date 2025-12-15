@@ -4,7 +4,7 @@ import sqlite3
 
 # Always use the database file that lives in the same folder as this script (src/)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "afa.db")
+DB_PATH = os.path.join(BASE_DIR, "afa_v2.db")
 DB_NAME = DB_PATH
 
 # CDC Household Pulse Survey: Anxiety / Depression indicators
@@ -148,13 +148,13 @@ def get_cdc_mental_health(api_url: str = CDC_API_URL):
         ):
             continue
 
-        # Example: '2020-04-23T00:00:00.000' -> '2020-04-23'
+        
         week_start_raw = row.get("time_period_start_date")
         if not week_start_raw:
             continue
         week = week_start_raw.split("T")[0]
 
-        # Initialize record for this week if not present
+       
         if week not in weeks:
             weeks[week] = {
                 "week": week,
@@ -179,7 +179,7 @@ def get_cdc_mental_health(api_url: str = CDC_API_URL):
     records = []
     for week_key in sorted(weeks.keys()):
         rec = weeks[week_key]
-        # keep weeks where at least one measure exists
+        # keeps weeks where at least one measure exists
         if rec["anxiety_percent"] is None and rec["depression_percent"] is None:
             continue
         records.append(rec)
