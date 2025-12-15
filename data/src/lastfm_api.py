@@ -99,9 +99,10 @@ def populate_lastfm(limit=25):
     try:
         rows = cur.execute(
             """
-            SELECT s.song_id, ss.song_title, ss.artist_name
+            SELECT s.song_id, ss.song_title, a.artist_name
             FROM Songs s
             JOIN ScrapedSongs ss ON ss.id = s.scraped_song_id
+            JOIN Artists a ON ss.artist_id = a.artist_id
             LEFT JOIN Popularity p ON p.song_id = s.song_id
             WHERE p.id IS NULL
             LIMIT ?;
