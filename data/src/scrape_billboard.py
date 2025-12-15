@@ -91,16 +91,33 @@ def store_scraped_songs(songs_list, db_path: str = DB_PATH):
     cur = conn.cursor()
 
     for song in songs_list:
+        artist_id = get_or_create_artist(cur, song["artist_name"])
+
         cur.execute(
             """
-            INSERT INTO ScrapedSongs (song_title, artist_name, genre, chart_date)
+            INSERT INTO ScrapedSongs (song_title, artist_id, genre, chart_date)
             VALUES (?, ?, ?, ?)
             """,
-            (song["song_title"], song["artist_name"], song["genre"], song["chart_date"]),
+            (
+                song["song_title"],
+                artist_id,
+                song["genre"],
+                song["chart_date"],
+            )
         )
 
     conn.commit()
     conn.close()
+
+
+def main():
+    print("Using DB file:", DB_PATH)
+
+    BILLBOARD_WEEKS_2020 = [
+        "2020-04-25",
+        "2020-05-02",
+        "2020-05-09",
+    ]
 
 
 def main():
