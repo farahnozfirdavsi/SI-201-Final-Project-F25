@@ -332,7 +332,7 @@ def plot_valence_vs_listeners():
         data=df,
         x="valence",
         y="listener_count",
-        color=PASTEL_COLORS[3],  # peach
+        color=PASTEL_COLORS[0],  # peach
         s=70,
         alpha=0.7,
         edgecolor="white",
