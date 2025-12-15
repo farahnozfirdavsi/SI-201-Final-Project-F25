@@ -44,7 +44,8 @@ def create_tables(db_name: str = DB_NAME) -> None:
         CREATE TABLE IF NOT EXISTS ScrapedSongs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             song_title   TEXT NOT NULL,
-            artist_name  TEXT NOT NULL,
+            artist_id INTEGER NOT NULL,
+            FOREIGN KEY (artist_id) REFERENCES Artists(artist_id),
             genre        TEXT,
             chart_date   TEXT NOT NULL
         );
