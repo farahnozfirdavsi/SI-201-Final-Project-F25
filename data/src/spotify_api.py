@@ -88,15 +88,16 @@ def populate_spotify_data(limit=25):
     print("Using database:", DB_PATH)
 
     rows = cur.execute(
-        """
-        SELECT ss.id, ss.song_title, ss.artist_name
-        FROM ScrapedSongs ss
-        LEFT JOIN Songs s ON s.scraped_song_id = ss.id
-        WHERE s.song_id IS NULL
-        LIMIT ?;
-        """,
-        (limit,),
-    ).fetchall()
+    """
+    SELECT ss.id, ss.song_title, a.artist_name
+    FROM ScrapedSongs ss
+    JOIN Artists a ON ss.artist_id = a.artist_id
+    LEFT JOIN Songs s ON s.scraped_song_id = ss.id
+    WHERE s.song_id IS NULL
+    LIMIT ?;
+    """,
+    (limit,),
+).fetchall()
 
     print(f"Found {len(rows)} scraped songs needing Spotify track info.")
 

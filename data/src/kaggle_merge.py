@@ -71,9 +71,10 @@ def load_project_songs():
         SELECT
             s.id AS scraped_id,
             s.song_title,
-            s.artist_name,
+            a.artist_name,
             t.song_id
         FROM ScrapedSongs s
+        JOIN Artists a ON s.artist_id = a.artist_id
         JOIN Songs t ON t.scraped_song_id = s.id
     """
     df = pd.read_sql_query(query, conn)
