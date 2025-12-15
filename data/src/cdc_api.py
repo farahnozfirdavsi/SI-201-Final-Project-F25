@@ -3,14 +3,12 @@ import requests
 import sqlite3
 from typing import List, Dict, Any
 
-# ---------- DB CONFIG (MATCHES YOUR SETUP) ----------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "afa_v2.db")
 DB_NAME = DB_PATH
 
 CDC_API_URL = "https://data.cdc.gov/resource/8pt5-q6wp.json"
-BATCH_SIZE = 25  # <-- EXACTLY 25 rows per run
-
+BATCH_SIZE = 25 
 
 def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
@@ -21,7 +19,7 @@ def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
 # ---------- FETCH ----------
 def fetch_cdc_rows(limit: int = BATCH_SIZE) -> List[Dict[str, Any]]:
     """
-    Fetch exactly `limit` rows from the CDC API.
+
     """
     params = {"$limit": limit}
     response = requests.get(CDC_API_URL, params=params, timeout=30)
@@ -33,7 +31,7 @@ def fetch_cdc_rows(limit: int = BATCH_SIZE) -> List[Dict[str, Any]]:
 def store_cdc_rows(rows: List[Dict[str, Any]]) -> int:
     """
     Append CDC rows into CDCRaw.
-    Does NOT delete or overwrite existing rows.
+    Does not delete or overwrite existing rows.
     """
     conn = get_connection()
     cur = conn.cursor()
