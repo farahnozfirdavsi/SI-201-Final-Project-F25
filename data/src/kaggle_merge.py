@@ -1,177 +1,139 @@
 import os
-import re
 import sqlite3
 import pandas as pd
 
-BASE_DIR = os.path.dirname(__file__)
+# ---- DB PATH  ----
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "afa.db")
 
-# Change this to your actual Kaggle file name in data/src
-KAGGLE_CSV_PATH = os.path.join(BASE_DIR, "spotify_kaggle_audio.csv")
+# ---- Kaggle CSV  ----
+KAGGLE_CSV = os.path.join(BASE_DIR, "spotify_kaggle_audio.csv")
 
 
-def normalize_title(text: str) -> str:
-    if not isinstance(text, str):
+def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
+    # timeout helps with occasional "database is locked"
+    conn = sqlite3.connect(db_path, timeout=30)
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
+
+def normalize(s) -> str:
+    if s is None:
         return ""
-    t = text.lower()
-
-    # Remove text in parentheses: "Song (Remastered)" -> "Song "
-    t = re.sub(r"\([^)]*\)", " ", t)
-
-    # Cut off after " - " ("Song - From The Movie")
-    t = re.split(r"\s+-\s+", t)[0]
-
-    # Cut off after feat/ft/featuring
-    t = re.split(r"\s+feat\.|\s+ft\.|\s+featuring", t)[0]
-
-    # Keep only letters, numbers, spaces
-    t = re.sub(r"[^a-z0-9\s]", " ", t)
-
-    # Collapse spaces
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
-
-
-def normalize_artist(text: str) -> str:
-    if not isinstance(text, str):
-        return ""
-    t = text.lower()
-
-    # Keep only the first primary artist before &, and, feat, ft, etc.
-    t = re.split(r"\s+feat\.|\s+ft\.|\s+featuring|\s+and\s+|&", t)[0]
-
-    t = re.sub(r"[^a-z0-9\s]", " ", t)
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
-
-
-def load_kaggle_audio():
-    print(f"Loading Kaggle audio features from: {KAGGLE_CSV_PATH}")
-    df = pd.read_csv(KAGGLE_CSV_PATH)
-
-    keep_cols = [
-        "track_name", "track_artist",
-        "danceability", "energy", "speechiness",
-        "acousticness", "instrumentalness", "liveness",
-        "valence", "tempo", "track_popularity",
-        "playlist_genre", "playlist_subgenre",
-    ]
-    df = df[keep_cols]
-
-    df["track_name_norm"] = df["track_name"].apply(normalize_title)
-    df["track_artist_norm"] = df["track_artist"].apply(normalize_artist)
-
-    print("Kaggle audio features loaded:", len(df), "rows")
-    return df
-
-
-def load_project_songs():
-    conn = sqlite3.connect(DB_PATH)
-    query = """
-        SELECT
-            s.id AS scraped_id,
-            s.song_title,
-            a.artist_name,
-            t.song_id
-        FROM ScrapedSongs s
-        JOIN Artists a ON s.artist_id = a.artist_id
-        JOIN Songs t ON t.scraped_song_id = s.id
-    """
-    df = pd.read_sql_query(query, conn)
-    conn.close()
-
-    print("Loaded project songs from DB:", len(df), "rows")
-
-    df["song_title_norm"] = df["song_title"].apply(normalize_title)
-    df["artist_name_norm"] = df["artist_name"].apply(normalize_artist)
-
-    return df
-
-
-def merge_kaggle_with_db_songs(kaggle_df, songs_df):
-    merged = songs_df.merge(
-        kaggle_df,
-        left_on=["song_title_norm", "artist_name_norm"],
-        right_on=["track_name_norm", "track_artist_norm"],
-        how="left",
-        suffixes=("_proj", "_kaggle"),
+    return (
+        str(s)
+        .lower()
+        .strip()
+        .replace("&", "and")
+        .replace("’", "'")
+        .replace("feat.", "ft.")
     )
+
+
+def ensure_audiofeatures_unique_songid(conn: sqlite3.Connection) -> None:
+    """
+    Needed so ON CONFLICT(song_id) works for UPSERT.
+    Safe: does not delete anything.
+    """
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_audiofeatures_songid
+        ON SpotifyAudioFeatures(song_id);
+    """)
+    conn.commit()
+
+
+def load_project_songs(conn: sqlite3.Connection) -> pd.DataFrame:
+    """
+    Pull song_id + song_title + artist_name from your normalized schema:
+    Songs -> ScrapedSongs -> Artists
+    """
+    q = """
+    SELECT
+        so.song_id,
+        ss.song_title,
+        ar.artist_name
+    FROM Songs so
+    JOIN ScrapedSongs ss ON ss.id = so.scraped_song_id
+    JOIN Artists ar ON ar.artist_id = ss.artist_id;
+    """
+    return pd.read_sql_query(q, conn)
+
+
+def main():
+    print("Loading Kaggle audio features from:", KAGGLE_CSV)
+    kag = pd.read_csv(KAGGLE_CSV)
+    print("Kaggle audio features loaded:", len(kag), "rows")
+
+    # Validate required columns based on YOUR Kaggle file
+    required = {"track_name", "track_artist", "valence", "energy", "danceability", "tempo", "acousticness", "instrumentalness"}
+    missing = required - set(kag.columns)
+    if missing:
+        raise ValueError(f"Kaggle CSV missing columns: {missing}")
+
+    conn = get_connection(DB_PATH)
+    ensure_audiofeatures_unique_songid(conn)
+
+    proj = load_project_songs(conn)
+    print("Loaded project songs from DB:", len(proj), "rows")
+
+    # Normalize join keys
+    proj["key_title"] = proj["song_title"].map(normalize)
+    proj["key_artist"] = proj["artist_name"].map(normalize)
+
+    kag["key_title"] = kag["track_name"].map(normalize)
+    kag["key_artist"] = kag["track_artist"].map(normalize)
+
+    # Many Kaggle rows repeat the same song across playlists.
+    # Collapse to one row per (title, artist) to avoid duplicates during merge.
+    kag_small = (
+        kag.sort_values("track_popularity", ascending=False)
+           .drop_duplicates(subset=["key_title", "key_artist"])
+           [["key_title", "key_artist", "valence", "energy", "danceability", "tempo", "acousticness", "instrumentalness"]]
+    )
+
+    merged = proj.merge(kag_small, how="left", on=["key_title", "key_artist"])
+
+    matched = merged[merged["valence"].notna()].copy()
 
     print("\nMerge result:")
-    print("Total songs in Songs table:", len(merged))
-    print("Matched rows with non-null valence:", merged["valence"].notna().sum())
+    print("Total songs in Songs table:", len(proj))
+    print("Matched rows with non-null valence:", len(matched))
 
     print("\nSample matched rows:")
-    print(
-        merged[merged["valence"].notna()][
-            [
-                "song_title",
-                "artist_name",
-                "track_name",
-                "track_artist",
-                "valence",
-                "energy",
-                "danceability",
-            ]
-        ].head()
-    )
+    print(matched[["song_title", "artist_name", "valence", "energy", "danceability"]].head())
 
-    return merged
+    # Prepare rows for UPSERT
+    rows = []
+    for _, r in matched.iterrows():
+        rows.append((
+            int(r["song_id"]),
+            float(r["valence"]) if pd.notna(r["valence"]) else None,
+            float(r["energy"]) if pd.notna(r["energy"]) else None,
+            float(r["danceability"]) if pd.notna(r["danceability"]) else None,
+            float(r["tempo"]) if pd.notna(r["tempo"]) else None,
+            float(r["acousticness"]) if pd.notna(r["acousticness"]) else None,
+            float(r["instrumentalness"]) if pd.notna(r["instrumentalness"]) else None,
+        ))
 
-
-def update_spotify_audiofeatures(merged_df):
-    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-
-    updated_count = 0
-
-    for _, row in merged_df.iterrows():
-        if pd.isna(row["valence"]):
-            continue  # nothing from Kaggle, skip
-
-        song_id = int(row["song_id"])
-        valence = float(row["valence"])
-        energy = float(row["energy"])
-        danceability = float(row["danceability"])
-        tempo = float(row["tempo"])
-        acousticness = float(row["acousticness"])
-        instrumentalness = float(row["instrumentalness"])
-
-        cur.execute(
-            """
-            UPDATE SpotifyAudioFeatures
-            SET
-                valence = ?,
-                energy = ?,
-                danceability = ?,
-                tempo = ?,
-                acousticness = ?,
-                instrumentalness = ?
-            WHERE song_id = ?
-            """,
-            (
-                valence,
-                energy,
-                danceability,
-                tempo,
-                acousticness,
-                instrumentalness,
-                song_id,
-            ),
-        )
-        updated_count += 1
+    cur.executemany("""
+        INSERT INTO SpotifyAudioFeatures
+            (song_id, valence, energy, danceability, tempo, acousticness, instrumentalness)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(song_id) DO UPDATE SET
+            valence = excluded.valence,
+            energy = excluded.energy,
+            danceability = excluded.danceability,
+            tempo = excluded.tempo,
+            acousticness = excluded.acousticness,
+            instrumentalness = excluded.instrumentalness;
+    """, rows)
 
     conn.commit()
     conn.close()
 
-    print(f"\nUpdated SpotifyAudioFeatures for {updated_count} songs.")
-
-
-def main():
-    kaggle_df = load_kaggle_audio()
-    songs_df = load_project_songs()
-    merged = merge_kaggle_with_db_songs(kaggle_df, songs_df)
-    update_spotify_audiofeatures(merged)
+    print(f"\nUpserted SpotifyAudioFeatures for {len(rows)} songs.")
 
 
 if __name__ == "__main__":
