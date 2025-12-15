@@ -8,6 +8,20 @@ from urllib.parse import urlparse
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "afa.db")
 
+def get_or_create_artist(cur, artist_name):
+    cur.execute(
+        "SELECT artist_id FROM Artists WHERE artist_name = ?",
+        (artist_name,),
+    )
+    row = cur.fetchone()
+    if row:
+        return row[0]
+
+    cur.execute(
+        "INSERT INTO Artists (artist_name) VALUES (?)",
+        (artist_name,),
+    )
+    return cur.lastrowid
 
 def extract_chart_date_from_url(url: str) -> str:
     """
