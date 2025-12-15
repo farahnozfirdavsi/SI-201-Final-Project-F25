@@ -3,7 +3,7 @@ import os
 
 # Default database name – you can change this if you want
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "afa_v2.db")
+DB_PATH = os.path.join(BASE_DIR, "afa.db")
 DB_NAME = DB_PATH
 
 def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:

@@ -1,9 +1,13 @@
+import os
 import requests
 from bs4 import BeautifulSoup
 import sqlite3
-
-
 from urllib.parse import urlparse
+
+# --- Always use the DB file located in the SAME folder as this script (src/) ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "afa.db")
+
 
 def extract_chart_date_from_url(url: str) -> str:
     """
@@ -18,32 +22,28 @@ def extract_chart_date_from_url(url: str) -> str:
     return "unknown-date"
 
 
-
-DB_NAME = "afa_v2.db"
-
-
-def get_connection(db_name: str = DB_NAME) -> sqlite3.Connection:
+def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
     """
     Helper to connect to the SQLite database with foreign keys on.
+    Uses an absolute path so we never accidentally create a new DB elsewhere.
     """
-    conn = sqlite3.connect(db_name)
+    conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
 
 def scrape_billboard(url: str):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
-
-    response = requests.get(url, headers=headers)
+    """
+    Scrape a Billboard Hot 100 chart page and return a list of dicts:
+    [{song_title, artist_name, chart_date, genre}, ...]
+    """
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    response = requests.get(url, headers=headers, timeout=20)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # NEW: always get a date from the URL
     chart_date = extract_chart_date_from_url(url)
-
     songs_data = []
 
     entries = soup.select("li.o-chart-results-list__item")
@@ -57,21 +57,23 @@ def scrape_billboard(url: str):
         artist_tag = entry.select_one("span.c-label")
         artist_name = artist_tag.get_text(strip=True) if artist_tag else "Unknown Artist"
 
-        song_info = {
-            "song_title": song_title,
-            "artist_name": artist_name,
-            "chart_date": chart_date,
-            "genre": None
-        }
-        songs_data.append(song_info)
+        songs_data.append(
+            {
+                "song_title": song_title,
+                "artist_name": artist_name,
+                "chart_date": chart_date,
+                "genre": None,
+            }
+        )
 
     return songs_data
 
-def store_scraped_songs(songs_list, db_name: str = DB_NAME):
+
+def store_scraped_songs(songs_list, db_path: str = DB_PATH):
     """
-    Take the list of dicts from scrape_billboard and insert them into ScrapedSongs.
+    Insert scraped songs into ScrapedSongs.
     """
-    conn = get_connection(db_name)
+    conn = get_connection(db_path)
     cur = conn.cursor()
 
     for song in songs_list:
@@ -80,12 +82,7 @@ def store_scraped_songs(songs_list, db_name: str = DB_NAME):
             INSERT INTO ScrapedSongs (song_title, artist_name, genre, chart_date)
             VALUES (?, ?, ?, ?)
             """,
-            (
-                song["song_title"],
-                song["artist_name"],
-                song["genre"],
-                song["chart_date"],
-            ),
+            (song["song_title"], song["artist_name"], song["genre"], song["chart_date"]),
         )
 
     conn.commit()
@@ -93,27 +90,29 @@ def store_scraped_songs(songs_list, db_name: str = DB_NAME):
 
 
 def main():
+    print("Using DB file:", DB_PATH)
+
     BILLBOARD_WEEKS_2020 = [
-    "2020-04-25",
-    "2020-05-02",
-    "2020-05-09",
-    "2020-05-16",
-    "2020-05-23",
-    "2020-05-30",
-    "2020-06-06",
-    "2020-06-13",
-    "2020-06-20",
-    "2020-06-27",
-    "2020-07-04",
-    "2020-07-11",
-    "2020-07-18",
-    "2020-07-25",
-    "2020-08-01",
-    "2020-08-08",
-    "2020-08-15",
-    "2020-08-22",
-    "2020-08-29",
-]
+        "2020-04-25",
+        "2020-05-02",
+        "2020-05-09",
+        "2020-05-16",
+        "2020-05-23",
+        "2020-05-30",
+        "2020-06-06",
+        "2020-06-13",
+        "2020-06-20",
+        "2020-06-27",
+        "2020-07-04",
+        "2020-07-11",
+        "2020-07-18",
+        "2020-07-25",
+        "2020-08-01",
+        "2020-08-08",
+        "2020-08-15",
+        "2020-08-22",
+        "2020-08-29",
+    ]
 
     total_inserted = 0
     MAX_PER_RUN = 25
@@ -124,14 +123,15 @@ def main():
 
         url = f"https://www.billboard.com/charts/hot-100/{week}/"
         print(f"\nScraping Billboard Hot 100 for {week} ...")
+
         songs = scrape_billboard(url)
 
-        # Only take the remaining allowed songs this run
         remaining = MAX_PER_RUN - total_inserted
         songs_to_store = songs[:remaining]
 
         print(f"  Storing {len(songs_to_store)} songs in database...")
         store_scraped_songs(songs_to_store)
+
         total_inserted += len(songs_to_store)
 
     print(f"\nDone scraping. Inserted {total_inserted} songs this run.")

@@ -5,7 +5,7 @@ from spotipy.oauth2 import SpotifyClientCredentials
 from keys import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
-DB_PATH = os.path.join(BASE_DIR, "afa_v2.db")
+DB_PATH = os.path.join(BASE_DIR, "afa.db")
 
 
 def get_connection():
