@@ -31,7 +31,7 @@ PASTEL_COLORS = [
 
 # Where to save plots
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # data/src
-DB_PATH = os.path.join(BASE_DIR, "afa.db")
+DB_PATH = os.path.join(BASE_DIR, "afa_og.db")
 PLOTS_DIR = os.path.join(BASE_DIR, "plots")
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
