@@ -17,6 +17,7 @@ def create_tables(db_name: str = DB_NAME) -> None:
     """
     Create all tables needed for the AFA: Anxiety, Frequency & APIs project.
     Tables:
+      - Artists
       - ScrapedSongs
       - Songs
       - SpotifyAudioFeatures
@@ -26,6 +27,16 @@ def create_tables(db_name: str = DB_NAME) -> None:
     """
     conn = get_connection(db_name)
     cur = conn.cursor()
+
+    # 0. Artists
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS Artists (
+            artist_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            artist_name TEXT UNIQUE NOT NULL
+        );
+        """
+    )
 
     # 1. Songs scraped from Billboard / Pitchfork etc.
     cur.execute(
