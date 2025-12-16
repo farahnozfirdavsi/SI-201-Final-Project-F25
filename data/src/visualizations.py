@@ -206,10 +206,6 @@ def get_high_low_anxiety_valence():
     return grouped
 
 
-# ==========================
-# Pretty plot functions 💖
-# ==========================
-
 def plot_weekly_mood_vs_anxiety():
     """
     Dual-axis line chart:
@@ -235,7 +231,7 @@ def plot_weekly_mood_vs_anxiety():
     color_valence = PASTEL_COLORS[0]   # pink
     color_anxiety = PASTEL_COLORS[2]   # lavender
 
-    # ---- Left axis line: avg valence ----
+    # Left axis line: avg valence 
     line1 = ax1.plot(
         df["date"],
         df["avg_valence"],
@@ -249,7 +245,7 @@ def plot_weekly_mood_vs_anxiety():
     ax1.set_ylabel("Average Valence (0–1)", color=color_valence)
     ax1.tick_params(axis="y", colors=color_valence)
 
-    # ---- Right axis line: anxiety % ----
+    #  Right axis line: anxiety % 
     ax2 = ax1.twinx()
     line2 = ax2.plot(
         df["date"],
@@ -263,7 +259,7 @@ def plot_weekly_mood_vs_anxiety():
     ax2.set_ylabel("Anxiety %", color=color_anxiety)
     ax2.tick_params(axis="y", colors=color_anxiety)
 
-    # ---- Correct combined legend ----
+    #  Correct combined legend 
     fig.legend(
         handles=[line1, line2],
         labels=["Avg Valence (Music Mood)", "Anxiety % (CDC)"],
@@ -414,9 +410,8 @@ def plot_high_low_anxiety_valence():
     plt.show()
 
 
-# ==========================
+
 # Main
-# ==========================
 
 def main():
     print("Plotting weekly mood vs anxiety...")

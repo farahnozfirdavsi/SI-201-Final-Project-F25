@@ -25,8 +25,6 @@ def get_or_create_artist(cur, artist_name):
 def extract_chart_date_from_url(url: str) -> str:
     """
     Extract the chart date from a Billboard chart URL.
-    Example URL: https://www.billboard.com/charts/hot-100/2024-01-06/
-    Returns: '2024-01-06'
     """
     path = urlparse(url).path.rstrip("/")
     parts = path.split("/")

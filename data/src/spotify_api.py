@@ -50,9 +50,7 @@ def get_spotify_track(sp, title, artist):
 
 def store_song_row(conn, scraped_song_id, track_info):
     """
-    Insert one row into Songs.
-    Assumes schema:
-      Songs(song_id, scraped_song_id, spotify_track_id, genre, popularity, release_year)
+    Insert one row into Songs
     """
     cur = conn.cursor()
 

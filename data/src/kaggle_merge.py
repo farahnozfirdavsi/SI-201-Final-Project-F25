@@ -2,11 +2,11 @@ import os
 import sqlite3
 import pandas as pd
 
-# ---- DB PATH  ----
+# DB PATH  
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "afa.db")
 
-# ---- Kaggle CSV  ----
+#  Kaggle CSV  
 KAGGLE_CSV = os.path.join(BASE_DIR, "spotify_kaggle_audio.csv")
 
 

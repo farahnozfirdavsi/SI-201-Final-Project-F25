@@ -3,7 +3,6 @@ import requests
 import sqlite3
 from typing import List, Dict, Optional, Tuple
 
-# Always use DB next to this script (src/)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "afa.db")
 
@@ -25,7 +24,7 @@ def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
 
 def get_or_create_id(cur, table: str, id_col: str, value_col: str, value: str) -> int:
     """
-    Insert value into lookup table if missing, then return its integer id.
+    Inserts value into lookup table if missing, then return its integer id.
     """
     cur.execute(f"INSERT OR IGNORE INTO {table} ({value_col}) VALUES (?)", (value,))
     cur.execute(f"SELECT {id_col} FROM {table} WHERE {value_col} = ?", (value,))

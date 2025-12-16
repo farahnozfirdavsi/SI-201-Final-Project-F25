@@ -2,7 +2,7 @@ import os
 import sqlite3
 import pandas as pd
 
-# Always point to the correct DB in data/src
+# the correct DB in data/src
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "afa_og.db")
 
