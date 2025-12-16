@@ -381,6 +381,7 @@ def plot_artist_emotional_profile():
     plt.show()
 
 
+#Aaliya
 def plot_high_low_anxiety_valence():
     """
     Grouped bar chart:
