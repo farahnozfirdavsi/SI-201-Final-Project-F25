@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 import sqlite3
 from urllib.parse import urlparse
 
-# --- Always use the DB file located in the SAME folder as this script (src/) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "afa.db")
 

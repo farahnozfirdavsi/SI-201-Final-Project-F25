@@ -109,9 +109,7 @@ def create_tables(db_path: str = DB_PATH) -> None:
         """
     )
 
-    # -----------------------------
     # NORMALIZED CDC LOOKUP TABLES
-    # -----------------------------
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS CDCGroup (

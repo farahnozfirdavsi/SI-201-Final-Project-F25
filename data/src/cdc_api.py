@@ -96,8 +96,7 @@ def insert_cdcr_fact(cur, group_id: int, state_id: int, indicator_id: int, time_
     Insert a CDCRaw fact row if not already present.
     Returns True if inserted, False if skipped.
     """
-    # If you added UNIQUE(group_id, state_id, indicator_id, time_id) you can use INSERT OR IGNORE.
-    # We'll still be safe and check manually:
+
     if cdcr_fact_exists(cur, group_id, state_id, indicator_id, time_id):
         return False
 

@@ -280,7 +280,7 @@ def plot_weekly_mood_vs_anxiety():
     print(f"[SAVED] {out_path}")
     plt.show()
 
-
+#Farah
 def plot_valence_vs_popularity():
     """
     Scatter plot:
@@ -314,7 +314,7 @@ def plot_valence_vs_popularity():
     print(f"[SAVED] {out_path}")
     plt.show()
 
-
+#Farah
 def plot_valence_vs_listeners():
     """
     Scatter plot:

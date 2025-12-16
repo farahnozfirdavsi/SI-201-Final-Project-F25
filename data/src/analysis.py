@@ -178,7 +178,6 @@ def compute_correlations():
     print("Correlation valence vs popularity:")
     print(corr_vp, "\n")
 
-    # Optionally: return these to use in report if you want
     return corr_weekly, corr_vp
 
 
